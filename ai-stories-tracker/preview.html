@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Stories Tracker — Preview</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8f9fa; --surface: #fff; --border: #e0e0e0;
+      --text: #202124; --muted: #5f6368; --accent: #1a73e8;
+      --radius: 12px;
+    }
+    body { font-family: 'Google Sans','Roboto',-apple-system,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+    /* Header */
+    .header { position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.08); }
+    .header-inner { max-width:1280px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px; }
+    .logo { display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;white-space:nowrap; }
+    .logo svg { flex-shrink:0; }
+    .header-actions { flex:1;max-width:500px;display:flex;align-items:center;gap:10px; }
+    .search-wrap { flex:1;position:relative;display:flex;align-items:center; }
+    .search-icon { position:absolute;left:12px;pointer-events:none; }
+    .search-input { width:100%;padding:8px 12px 8px 36px;border:1px solid var(--border);border-radius:24px;font-size:14px;outline:none;background:var(--bg); }
+    .search-input:focus { border-color:var(--accent);box-shadow:0 0 0 2px rgba(26,115,232,.2); }
+    .refresh-btn { background:none;border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted); }
+
+    /* Banner */
+    .demo-banner { background:#fff3cd;border-bottom:1px solid #ffc107;padding:8px 20px;text-align:center;font-size:13px;color:#856404; }
+
+    /* Layout */
+    .layout { max-width:1280px;margin:0 auto;padding:20px;display:grid;grid-template-columns:240px 1fr;gap:20px;align-items:start; }
+
+    /* Sidebar */
+    .sidebar { position:sticky;top:73px;background:#fff;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden; }
+    .sidebar-section { padding:14px 16px;border-bottom:1px solid var(--border); }
+    .sidebar-section:last-child { border-bottom:none; }
+    .sidebar-title { font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px; }
+    .source-list { display:flex;flex-direction:column;gap:2px; }
+    .source-btn { display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border:none;background:none;border-radius:8px;font-size:13px;cursor:pointer;text-align:left;color:var(--text);transition:background .15s; }
+    .source-btn:hover { background:var(--bg); }
+    .source-btn.active { background:#e8f0fe;color:var(--accent);font-weight:500; }
+    .source-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+    .stat-row { display:flex;justify-content:space-between;padding:4px 0;font-size:13px; }
+    .stat-label { color:var(--muted); }
+    .stat-val { font-weight:500; }
+    .topics { display:flex;flex-wrap:wrap;gap:6px; }
+    .topic-chip { background:#e8f0fe;color:var(--accent);border-radius:16px;padding:3px 10px;font-size:12px;cursor:pointer; }
+
+    /* Main toolbar */
+    .toolbar { display:flex;align-items:center;justify-content:space-between;margin-bottom:16px; }
+    .results-info { font-size:13px;color:var(--muted); }
+    .sort-wrap { display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted); }
+    .sort-wrap select { border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;background:#fff;cursor:pointer; }
+
+    /* Grid */
+    .stories-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px; }
+
+    /* Card */
+    .card { background:#fff;border-radius:var(--radius);border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:box-shadow .2s,transform .15s;text-decoration:none;color:inherit; }
+    .card:hover { box-shadow:0 4px 12px rgba(0,0,0,.15);transform:translateY(-2px); }
+    .card-thumb { width:100%;height:160px;object-fit:cover;display:block; }
+    .card-placeholder { width:100%;height:160px;display:flex;align-items:center;justify-content:center;font-size:40px; }
+    .card-body { padding:14px 16px 16px;flex:1;display:flex;flex-direction:column;gap:8px; }
+    .card-meta { display:flex;align-items:center;justify-content:space-between; }
+    .card-source { display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px; }
+    .card-dot { width:6px;height:6px;border-radius:50%; }
+    .card-time { font-size:11px;color:var(--muted); }
+    .card-title { font-size:15px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden; }
+    .card-snippet { font-size:13px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+    .card-footer { margin-top:auto;padding-top:8px;text-align:right; }
+    .read-more { font-size:12px;color:var(--accent);font-weight:500; }
+
+    /* Pagination */
+    .pagination { display:flex;align-items:center;justify-content:center;gap:16px;margin-top:32px; }
+    .btn-page { background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 18px;font-size:14px;cursor:pointer; }
+    .btn-page:hover { border-color:var(--accent);color:var(--accent); }
+    .page-info { font-size:13px;color:var(--muted); }
+  </style>
+</head>
+<body>
+
+<div class="demo-banner">
+  🔍 <strong>Static Preview</strong> — This shows the app's UI with sample data. Run <code>npm start</code> for live AI stories.
+</div>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <circle cx="14" cy="14" r="13" fill="#1a73e8"/>
+        <path d="M8 14.5c0-3.31 2.69-6 6-6s6 2.69 6 6-2.69 6-6 6-6-2.69-6-6z" fill="white" opacity="0.3"/>
+        <path d="M11 12l3 3 3-3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M11 16l3 3 3-3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+      </svg>
+      AI Stories Tracker
+    </div>
+    <div class="header-actions">
+      <div class="search-wrap">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <circle cx="11" cy="11" r="8" stroke="#5f6368" stroke-width="2"/>
+          <path d="M21 21l-4.35-4.35" stroke="#5f6368" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <input class="search-input" type="text" placeholder="Search AI stories…" />
+      </div>
+      <button class="refresh-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M23 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Sources</div>
+      <div class="source-list">
+        <button class="source-btn active"><span class="source-dot" style="background:#1a73e8"></span>All Sources</button>
+        <button class="source-btn"><span class="source-dot" style="background:#0a8217"></span>TechCrunch AI</button>
+        <button class="source-btn"><span class="source-dot" style="background:#e8372c"></span>VentureBeat AI</button>
+        <button class="source-btn"><span class="source-dot" style="background:#990000"></span>MIT Technology Review</button>
+        <button class="source-btn"><span class="source-dot" style="background:#fa4b2a"></span>The Verge AI</button>
+        <button class="source-btn"><span class="source-dot" style="background:#000"></span>Wired AI</button>
+        <button class="source-btn"><span class="source-dot" style="background:#ff4e00"></span>Ars Technica AI</button>
+        <button class="source-btn"><span class="source-dot" style="background:#4285f4"></span>Google AI Blog</button>
+        <button class="source-btn"><span class="source-dot" style="background:#10a37f"></span>OpenAI News</button>
+        <button class="source-btn"><span class="source-dot" style="background:#1a73e8"></span>DeepMind Blog</button>
+        <button class="source-btn"><span class="source-dot" style="background:#ff9d00"></span>Hugging Face Blog</button>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Stats</div>
+      <div class="stat-row"><span class="stat-label">Total Stories</span><span class="stat-val">142</span></div>
+      <div class="stat-row"><span class="stat-label">Last Updated</span><span class="stat-val">2m ago</span></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Trending Topics</div>
+      <div class="topics">
+        <span class="topic-chip">ChatGPT</span>
+        <span class="topic-chip">Claude</span>
+        <span class="topic-chip">Gemini</span>
+        <span class="topic-chip">OpenAI</span>
+        <span class="topic-chip">Agents</span>
+        <span class="topic-chip">Safety</span>
+        <span class="topic-chip">Chips</span>
+        <span class="topic-chip">Mistral</span>
+        <span class="topic-chip">Robotics</span>
+        <span class="topic-chip">Regulation</span>
+        <span class="topic-chip">Research</span>
+        <span class="topic-chip">DeepMind</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main>
+    <div class="toolbar">
+      <div class="results-info">142 AI stories</div>
+      <div class="sort-wrap">
+        <label>Sort:</label>
+        <select><option>Newest First</option><option>By Source</option></select>
+      </div>
+    </div>
+
+    <div class="stories-grid">
+
+      <!-- Card 1 -->
+      <a class="card" href="#" onclick="return false">
+        <div class="card-placeholder" style="background:linear-gradient(135deg,#e8f0fe,#c5d8fc)">🧠</div>
+        <div class="card-body">
+          <div class="card-meta">
+            <div class="card-source"><span class="card-dot" style="background:#10a37f"></span><span style="color:#10a37f">OpenAI News</span></div>
+            <span class="card-time">12m ago</span>
+          </div>
+          <div class="card-title">OpenAI Announces GPT-5 with Unprecedented Reasoning Capabilities</div>
+          <div class="card-snippet">The new model demonstrates major improvements in multi-step reasoning, coding, and scientific problem-solving compared to its predecessor.</div>
+          <div class="card-footer"><span class="read-more">Read more →</span></div>
+        </div>
+      </a>
+
+      <!-- Card 2 -->
+      <a class="card" href="#" onclick="return false">
+        <div class="card-placeholder" style="background:linear-gradient(135deg,#fce8e6,#f5c6c2)">🤖</div>
+        <div class="card-body">
+          <div class="card-meta">
+            <div class="card-source"><span class="card-dot" style="background:#e8372c"></span><span style="color:#e8372c">VentureBeat AI</span></div>
+            <span class="card-time">34m ago</span>
+          </div>
+          <div class="card-title">Anthropic's Claude 4 Sets New Benchmark on Agentic Tasks</div>
+          <div class="card-snippet">Claude 4 outperforms competing models on complex, long-horizon tasks requiring tool use and autonomous decision-making.</div>
+          <div class="card-footer"><span class="read-more">Read more →</span></div>
+        </div>
+      </a>
+
+      <!-- Card 3 -->
+      <a class="card" href="#" onclick="return false">
+        <div class="card-placeholder" style="background:linear-gradient(135deg,#e6f4ea,#c3e6cb)">💰</div>
+        <div class="card-body">
+          <div class="card-meta">
+            <div class="card-source"><span class="card-dot" style="background:#0a8217"></span><span style="color:#0a8217">TechCrunch AI</span></div>
+            <span class="card-time">1h ago</span>
+          </div>
+          <div class="card-title">AI Startup Raises $500M to Build Foundation Models for Healthcare</div>
+          <div class="card-snippet">The funding round, led by Andreessen Horowitz, will accelerate development of specialized medical AI models for diagnosis and treatment planning.</div>
+          <div class="card-footer"><span class="read-more">Read more →</span></div>
+        </div>
+      </a>
+
+      <!-- Card 4 -->
+      <a class="card" href="#" onclick="return false">
+        <div class="card-placeholder" style="background:linear-gradient(135deg,#fef3e2,#fde1a0)">💻</div>
+        <div class="card-body">
+          <div class="card-meta">
+            <div class="card-source"><span class="card-dot" style="background:#ff4e00"></span><span style="color:#ff4e00">Ars Technica AI</span></div>
+            <span class="card-time">2h ago</span>
+          </div>
+          <div class="card-title">NVIDIA's Next-Gen AI Chip Delivers 4x Performance Uplift</div>
+          <div class="card-snippet">The new Blackwell Ultra architecture promises dramatic improvements for large model training and inference at scale.</div>
+          <div class="card-footer"><span class="read-more">Read more →</span></div>
+        </div>
+      </a>
+
+      <!-- Card 5 -->
+      <a class="card" href="#" onclick="return false">
+        <div class="card-placeholder" style="background:linear-gradient(135deg,#e8eaf6,#c5cae9)">🛡️</div>
+        <div class="card-body">
+          <div class="card-meta">
+            <div class="card-source"><span class="card-dot" style="background:#1a73e8"></span><span style="color:#1a73e8">DeepMind Blog</span></div>
+            <span class="card-time">3h ago</span>
+          </div>
+          <div class="card-title">DeepMind Publishes New AI Safety Framework for Frontier Models</div>
+          <div class="card-snippet">The framework introduces formal evaluation criteria for dangerous capabilities and proposes mitigation strategies for advanced AI systems.</div>
+          <div class="card-footer"><span class="read-more">Read more →</span></div>
+        </div>
+      </a>
+
+      <!-- Card 6 -->
+      <a class="card" href="#" onclick="return false">
+        <div class="card-placeholder" style="background:linear-gradient(135deg,#fce4ec,#f8bbd0)">🎨</div>
+        <div class="card-body">
+          <div class="card-meta">
+            <div class="card-source"><span class="card-dot" style="background:#fa4b2a"></span><span style="color:#fa4b2a">The Verge AI</span></div>
+            <span class="card-time">4h ago</span>
+          </div>
+          <div class="card-title">Google's Gemini 2.0 Can Now Generate Real-Time Video From Text</div>
+          <div class="card-snippet">The multimodal model now supports streaming video generation, enabling real-time creative content production for consumers and developers.</div>
+          <div class="card-footer"><span class="read-more">Read more →</span></div>
+        </div>
+      </a>
+
+      <!-- Card 7 -->
+      <a class="card" href="#" onclick="return false">
+        <div class="card-placeholder" style="background:linear-gradient(135deg,#f3e5f5,#e1bee7)">📊</div>
+        <div class="card-body">
+          <div class="card-meta">
+            <div class="card-source"><span class="card-dot" style="background:#990000"></span><span style="color:#990000">MIT Technology Review</span></div>
+            <span class="card-time">5h ago</span>
+          </div>
+          <div class="card-title">Researchers Discover How LLMs Store and Retrieve Factual Knowledge</div>
+          <div class="card-snippet">A new interpretability study maps specific circuits in transformer models responsible for storing discrete facts, opening doors for more reliable AI.</div>
+          <div class="card-footer"><span class="read-more">Read more →</span></div>
+        </div>
+      </a>
+
+      <!-- Card 8 -->
+      <a class="card" href="#" onclick="return false">
+        <div class="card-placeholder" style="background:linear-gradient(135deg,#e0f2f1,#b2dfdb)">⚖️</div>
+        <div class="card-body">
+          <div class="card-meta">
+            <div class="card-source"><span class="card-dot" style="background:#000"></span><span style="color:#333">Wired AI</span></div>
+            <span class="card-time">6h ago</span>
+          </div>
+          <div class="card-title">EU AI Act Enforcement Begins: What It Means for Big Tech</div>
+          <div class="card-snippet">The landmark regulation takes effect this month, requiring companies to disclose AI system capabilities and submit to third-party audits.</div>
+          <div class="card-footer"><span class="read-more">Read more →</span></div>
+        </div>
+      </a>
+
+      <!-- Card 9 -->
+      <a class="card" href="#" onclick="return false">
+        <div class="card-placeholder" style="background:linear-gradient(135deg,#fff8e1,#ffecb3)">🔓</div>
+        <div class="card-body">
+          <div class="card-meta">
+            <div class="card-source"><span class="card-dot" style="background:#ff9d00"></span><span style="color:#ff9d00">Hugging Face Blog</span></div>
+            <span class="card-time">8h ago</span>
+          </div>
+          <div class="card-title">Mistral Releases Mixtral 8x22B Under Apache 2.0 License</div>
+          <div class="card-snippet">The open-weights mixture-of-experts model rivals GPT-4 on several benchmarks and is freely available for commercial use.</div>
+          <div class="card-footer"><span class="read-more">Read more →</span></div>
+        </div>
+      </a>
+
+    </div>
+
+    <div class="pagination">
+      <button class="btn-page" disabled>← Previous</button>
+      <span class="page-info">Page 1 of 8</span>
+      <button class="btn-page">Next →</button>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>
