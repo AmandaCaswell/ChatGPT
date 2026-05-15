@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Store Savings Tracker</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f9fc;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --good: #166534;
+      --bad: #991b1b;
+      --line: #e5e7eb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+    }
+
+    h1, h2 {
+      margin-top: 0;
+      line-height: 1.2;
+    }
+
+    p { color: var(--muted); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      padding: 10px 8px;
+      vertical-align: top;
+    }
+
+    .inputs input {
+      width: 100%;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn.secondary {
+      background: #475569;
+    }
+
+    .actions {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+    }
+
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: #f8fafc;
+    }
+
+    .kpi .label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .kpi .value {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .good { color: var(--good); font-weight: 600; }
+    .bad { color: var(--bad); font-weight: 600; }
+
+    .history-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 260px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    @media (max-width: 900px) {
+      .history-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>Store Savings Tracker</h1>
+      <p>Enter each item and what you paid at both stores. The app compares item-by-item, finds your cheapest basket, and saves each shopping trip to track spending trends over time.</p>
+      <table id="listTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Store A Price ($)</th>
+            <th>Store B Price ($)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody class="inputs"></tbody>
+      </table>
+      <div class="actions">
+        <button class="btn" id="addRowBtn">Add Item</button>
+        <button class="btn" id="analyzeBtn">Analyze List</button>
+        <button class="btn secondary" id="clearBtn">Clear Inputs</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Comparison Results</h2>
+      <div class="summary" id="summary"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Store A</th>
+            <th>Store B</th>
+            <th>Cheaper Store</th>
+            <th>Savings</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Spending Trend</h2>
+      <div class="history-grid">
+        <canvas id="trendChart" width="760" height="260"></canvas>
+        <div>
+          <p>Each analysis is saved as a shopping trip. This chart tracks:</p>
+          <ul>
+            <li>Actual total at Store A</li>
+            <li>Actual total at Store B</li>
+            <li>Best possible total by mixing cheaper items</li>
+          </ul>
+          <button class="btn secondary" id="clearHistoryBtn">Clear History</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'store-savings-history-v1';
+
+    const listBody = document.querySelector('#listTable tbody');
+    const addRowBtn = document.getElementById('addRowBtn');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const summaryEl = document.getElementById('summary');
+    const resultsBody = document.getElementById('resultsBody');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    const trendCanvas = document.getElementById('trendChart');
+
+    const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+    function addRow(item = '', a = '', b = '') {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input type="text" placeholder="e.g., Eggs" value="${item}" /></td>
+        <td><input type="number" min="0" step="0.01" placeholder="0.00" value="${a}" /></td>
+        <td><input type="number" min="0" step="0.01" placeholder="0.00" value="${b}" /></td>
+        <td><button class="btn secondary">Remove</button></td>
+      `;
+      row.querySelector('button').addEventListener('click', () => row.remove());
+      listBody.appendChild(row);
+    }
+
+    function getRows() {
+      return [...listBody.querySelectorAll('tr')]
+        .map((row) => {
+          const [itemInput, aInput, bInput] = row.querySelectorAll('input');
+          return {
+            item: itemInput.value.trim(),
+            a: Number(aInput.value),
+            b: Number(bInput.value)
+          };
+        })
+        .filter((r) => r.item && Number.isFinite(r.a) && Number.isFinite(r.b));
+    }
+
+    function loadHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveHistory(entry) {
+      const history = loadHistory();
+      history.push(entry);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      drawTrend(history);
+    }
+
+    function analyze() {
+      const rows = getRows();
+      if (!rows.length) {
+        alert('Please add at least one valid item with prices at both stores.');
+        return;
+      }
+
+      let totalA = 0;
+      let totalB = 0;
+      let optimalTotal = 0;
+
+      const detail = rows.map((r) => {
+        totalA += r.a;
+        totalB += r.b;
+        const cheaper = r.a === r.b ? 'Tie' : r.a < r.b ? 'Store A' : 'Store B';
+        const minPrice = Math.min(r.a, r.b);
+        const savings = Math.abs(r.a - r.b);
+        optimalTotal += minPrice;
+        return { ...r, cheaper, savings };
+      });
+
+      const bestSingleStore = Math.min(totalA, totalB);
+      const optimalSavings = bestSingleStore - optimalTotal;
+
+      renderSummary({ totalA, totalB, bestSingleStore, optimalTotal, optimalSavings, itemCount: rows.length });
+      renderResults(detail);
+
+      saveHistory({
+        date: new Date().toISOString().slice(0, 10),
+        totalA,
+        totalB,
+        optimalTotal,
+        optimalSavings
+      });
+    }
+
+    function renderSummary(data) {
+      const winner = data.totalA === data.totalB ? 'Tie' : data.totalA < data.totalB ? 'Store A' : 'Store B';
+      summaryEl.innerHTML = `
+        <div class="kpi"><div class="label">Items Compared</div><div class="value">${data.itemCount}</div></div>
+        <div class="kpi"><div class="label">Store A Total</div><div class="value">${currency.format(data.totalA)}</div></div>
+        <div class="kpi"><div class="label">Store B Total</div><div class="value">${currency.format(data.totalB)}</div></div>
+        <div class="kpi"><div class="label">Cheaper Single Store</div><div class="value">${winner}</div></div>
+        <div class="kpi"><div class="label">Best Mixed Total</div><div class="value">${currency.format(data.optimalTotal)}</div></div>
+        <div class="kpi"><div class="label">Extra Savings vs Best Single Store</div><div class="value ${data.optimalSavings > 0 ? 'good' : ''}">${currency.format(data.optimalSavings)}</div></div>
+      `;
+    }
+
+    function renderResults(items) {
+      resultsBody.innerHTML = items.map((i) => `
+        <tr>
+          <td>${i.item}</td>
+          <td>${currency.format(i.a)}</td>
+          <td>${currency.format(i.b)}</td>
+          <td class="${i.cheaper === 'Tie' ? '' : 'good'}">${i.cheaper}</td>
+          <td class="${i.savings > 0 ? 'good' : ''}">${currency.format(i.savings)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function drawTrend(history = loadHistory()) {
+      const ctx = trendCanvas.getContext('2d');
+      const { width, height } = trendCanvas;
+      ctx.clearRect(0, 0, width, height);
+
+      if (!history.length) {
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('No history yet. Analyze a list to start tracking trends.', 22, 40);
+        return;
+      }
+
+      const padding = 35;
+      const chartW = width - padding * 2;
+      const chartH = height - padding * 2;
+      const values = history.flatMap((h) => [h.totalA, h.totalB, h.optimalTotal]);
+      const max = Math.max(...values, 1);
+
+      function y(v) { return padding + chartH - (v / max) * chartH; }
+      function x(i) { return padding + (history.length === 1 ? chartW / 2 : (i / (history.length - 1)) * chartW); }
+
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.beginPath();
+      ctx.moveTo(padding, padding);
+      ctx.lineTo(padding, padding + chartH);
+      ctx.lineTo(padding + chartW, padding + chartH);
+      ctx.stroke();
+
+      const lines = [
+        { key: 'totalA', color: '#2563eb', label: 'Store A' },
+        { key: 'totalB', color: '#16a34a', label: 'Store B' },
+        { key: 'optimalTotal', color: '#f59e0b', label: 'Best Mixed' }
+      ];
+
+      lines.forEach((line, index) => {
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        history.forEach((h, i) => {
+          const px = x(i);
+          const py = y(h[line.key]);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+          ctx.fillStyle = line.color;
+          ctx.beginPath();
+          ctx.arc(px, py, 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.stroke();
+
+        ctx.fillStyle = line.color;
+        ctx.fillRect(width - 130, 20 + index * 20, 12, 12);
+        ctx.fillStyle = '#111827';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(line.label, width - 112, 30 + index * 20);
+      });
+
+      ctx.fillStyle = '#374151';
+      ctx.font = '11px sans-serif';
+      history.forEach((h, i) => {
+        const px = x(i);
+        ctx.fillText(h.date.slice(5), px - 14, height - 8);
+      });
+    }
+
+    addRow('Milk', '3.49', '3.19');
+    addRow('Bread', '2.99', '3.29');
+    addRow('Eggs', '4.59', '4.39');
+    drawTrend();
+
+    addRowBtn.addEventListener('click', () => addRow());
+    analyzeBtn.addEventListener('click', analyze);
+    clearBtn.addEventListener('click', () => listBody.innerHTML = '');
+    clearHistoryBtn.addEventListener('click', () => {
+      localStorage.removeItem(STORAGE_KEY);
+      drawTrend([]);
+    });
+  </script>
+</body>
+</html>
